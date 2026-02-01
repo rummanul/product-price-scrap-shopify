@@ -170,29 +170,30 @@ with sync_playwright() as p:
     time.sleep(1)
     select_option(page, "Internal/Text Pages Stock", ist)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for cp, cs, lm, ip, ist, pg in product(
-            COVER_PRINTING,
-            COVER_STOCK,
-            LAMINATE,
-            INTERNAL_PRINTING,
-            INTERNAL_STOCK,
-            PAGES
-        ):
-            config = (
-                f"A5P_{COVER_PRINTING[cp]}_{COVER_STOCK[cs]}_"
-                f"{LAMINATE[lm]}_{INTERNAL_PRINTING[ip]}_{INTERNAL_STOCK[ist]}_pp{pg}"
-            )
+    for cp, cs, lm, ip, ist, pg in product(
+        COVER_PRINTING,
+        COVER_STOCK,
+        LAMINATE,
+        INTERNAL_PRINTING,
+        INTERNAL_STOCK,
+        PAGES
+    ):
+        config = (
+            f"A5P_{COVER_PRINTING[cp]}_{COVER_STOCK[cs]}_"
+            f"{LAMINATE[lm]}_{INTERNAL_PRINTING[ip]}_{INTERNAL_STOCK[ist]}_pp{pg}"
+        )
 
-            log("=" * 60)
-            log(f"START CONFIG: {config}")
+        log("=" * 60)
+        log(f"START CONFIG: {config}")
+
+        # Open in append mode inside the loop to "save" frequently
+        with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
             f.write(config + "\n")
 
             try:
                 time.sleep(1)
                 select_option(page, "Internal/Text Pages (pp) Excluding Cover", pg)
-                    
-                # time.sleep(1)
+                
                 for qty in QUANTITIES:
                     try:
                         select_option(page, "Quantity", qty)
@@ -205,14 +206,12 @@ with sync_playwright() as p:
                         f.write(f"{qty};;ERROR\n")
                         continue
 
-
-                f.write("\n")
+                f.write("\n") # Add a newline between configurations
 
             except Exception as e:
                 log(f"CONFIG ERROR ❌ {e}")
                 f.write("CONFIG ERROR\n\n")
-
-    log("Closing browser")
-    browser.close()
+        log("Closing browser")
+        browser.close()
 
 log("DONE ✔ Output written to A5_PERFECT_BOUND_OUTPUT.txt")
