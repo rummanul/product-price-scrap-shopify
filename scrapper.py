@@ -27,7 +27,7 @@ QUANTITIES = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130,
 
 
 def log(msg):
-    print(f"[LOG] {msg}")
+    print(f"[LOG] {msg}", flush=True)
 
 
 def ensure_page_alive(page):
