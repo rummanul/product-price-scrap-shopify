@@ -118,6 +118,30 @@ def force_internal_printing(page, value):
 
     raise Exception("Internal/Text Pages Printing NOT locked")
 
+# =====================================================
+# APPLY CONFIG
+# =====================================================
+def apply_current_config(page, cp, cs, lm, ip, ist, pg):
+    ensure_page_alive(page)
+
+    page.wait_for_load_state("networkidle")
+    time.sleep(2)
+
+    select_option(page, "Finished Size (mm)", "A5 Portrait - 148x210")
+    time.sleep(0.5)
+    select_option(page, "Cover Printing", cp)
+    time.sleep(0.5)
+    select_option(page, "Cover Stock", cs)
+    time.sleep(0.5)
+    select_option(page, "Cover Laminate (outside only)", lm)
+    time.sleep(0.5)
+    force_internal_printing(page, ip)
+    time.sleep(0.5)
+    select_option(page, "Internal/Text Pages Stock", ist)
+    time.sleep(0.5)
+    select_option(page, "Internal/Text Pages (pp) Excluding Cover", pg)
+    time.sleep(0.5)
+
 
 # =====================================================
 # PRICE FETCH (COMMA-SAFE)
@@ -195,16 +219,33 @@ with sync_playwright() as p:
                 select_option(page, "Internal/Text Pages (pp) Excluding Cover", pg)
                 
                 for qty in QUANTITIES:
-                    try:
-                        select_option(page, "Quantity", qty)
-                        price = get_price(page)
-                        print(f"{price} {price - 10:.2f}")
-                        f.write(f"{qty};;{price - 10:.2f}\n")
+                    for attempt in range(1, 3):  # retry once after reload
+                        try:
+                            log(f"Quantity {qty} (attempt {attempt})")
 
-                    except Exception as e:
-                        log(f"QTY ERROR (qty={qty}) ❌ {e}")
-                        f.write(f"{qty};;ERROR\n")
-                        continue
+                            select_option(page, "Quantity", qty)
+                            price = get_price(page)
+
+                            final_price = price - 10
+                            print(f"{price} {final_price:.2f}")
+                            f.write(f"{qty};;{final_price:.2f}\n")
+
+                            break  # success → exit retry loop
+
+                        except Exception as e:
+                            log(f"QTY ERROR (qty={qty}) ❌ {e}")
+
+                            if attempt == 2:
+                                f.write(f"{qty};;ERROR\n")
+                                break
+
+                            log("Reloading page and restoring config…")
+                            page.reload(timeout=60000)
+
+                            apply_current_config(
+                                page,
+                                cp, cs, lm, ip, ist, pg
+                            )
 
                 f.write("\n") # Add a newline between configurations
 
