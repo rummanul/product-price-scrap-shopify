@@ -117,6 +117,30 @@ def force_internal_printing(page, value):
 
     raise Exception("Internal/Text Pages Printing NOT locked")
 
+# =====================================================
+# APPLY CONFIG
+# =====================================================
+def apply_current_config(page, cp, cs, lm, ip, ist, pg):
+    ensure_page_alive(page)
+
+    page.wait_for_load_state("networkidle")
+    time.sleep(2)
+
+    select_option(page, "Finished Size (mm)", "A5 Portrait - 148x210")
+    time.sleep(0.5)
+    select_option(page, "Cover Printing", cp)
+    time.sleep(0.5)
+    select_option(page, "Cover Stock", cs)
+    time.sleep(0.5)
+    select_option(page, "Cover Laminate (outside only)", lm)
+    time.sleep(0.5)
+    force_internal_printing(page, ip)
+    time.sleep(0.5)
+    select_option(page, "Internal/Text Pages Stock", ist)
+    time.sleep(0.5)
+    select_option(page, "Internal/Text Pages (pp) Excluding Cover", pg)
+    time.sleep(0.5)
+
 
 # =====================================================
 # PRICE FETCH (COMMA-SAFE)
@@ -149,61 +173,85 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     log("Page loaded")
 
+    
+    cp = list(COVER_PRINTING.keys())[0]
+    cs = list(COVER_STOCK.keys())[0]
+    lm = list(LAMINATE.keys())[0]
+    ip = list(INTERNAL_PRINTING.keys())[0]
+    ist = list(INTERNAL_STOCK.keys())[0]
+
     time.sleep(3)
     select_option(page, "Finished Size (mm)", "A5 Portrait - 148x210")
     time.sleep(1)
-    select_option(page, "Cover Printing", list(COVER_PRINTING.keys())[0])
+    select_option(page, "Cover Printing", cp)
     time.sleep(1)
-    select_option(page, "Cover Stock", list(COVER_STOCK.keys())[0])
+    select_option(page, "Cover Stock", cs)
     time.sleep(1)
-    select_option(page, "Cover Laminate (outside only)", list(LAMINATE.keys())[0])
+    select_option(page, "Cover Laminate (outside only)", lm)
     time.sleep(1)
-    force_internal_printing(page, list(INTERNAL_PRINTING.keys())[0])
+    force_internal_printing(page, ip)
     time.sleep(1)
-    select_option(page, "Internal/Text Pages Stock", list(INTERNAL_STOCK.keys())[0])
+    select_option(page, "Internal/Text Pages Stock", ist)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for cp, cs, lm, ip, ist, pg in product(
-            COVER_PRINTING,
-            COVER_STOCK,
-            LAMINATE,
-            INTERNAL_PRINTING,
-            INTERNAL_STOCK,
-            PAGES
-        ):
-            config = (
-                f"A5P_{COVER_PRINTING[cp]}_{COVER_STOCK[cs]}_"
-                f"{LAMINATE[lm]}_{INTERNAL_PRINTING[ip]}_{INTERNAL_STOCK[ist]}_pp{pg}"
-            )
+    for cp, cs, lm, ip, ist, pg in product(
+        COVER_PRINTING,
+        COVER_STOCK,
+        LAMINATE,
+        INTERNAL_PRINTING,
+        INTERNAL_STOCK,
+        PAGES
+    ):
+        config = (
+            f"A5P_{COVER_PRINTING[cp]}_{COVER_STOCK[cs]}_"
+            f"{LAMINATE[lm]}_{INTERNAL_PRINTING[ip]}_{INTERNAL_STOCK[ist]}_pp{pg}"
+        )
 
-            log("=" * 60)
-            log(f"START CONFIG: {config}")
+        log("=" * 60)
+        log(f"START CONFIG: {config}")
+
+        # Open in append mode inside the loop to "save" frequently
+        with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
             f.write(config + "\n")
 
             try:
                 time.sleep(1)
                 select_option(page, "Internal/Text Pages (pp) Excluding Cover", pg)
-                    
-                # time.sleep(1)
+                
                 for qty in QUANTITIES:
-                    try:
-                        select_option(page, "Quantity", qty)
-                        price = get_price(page)
-                        print(f"{price} {price - 10:.2f}")
-                        f.write(f"{qty};;{price - 10:.2f}\n")
+                    for attempt in range(1, 3):  # retry once after reload
+                        try:
+                            # log(f"Quantity {qty} (attempt {attempt})")
 
-                    except Exception as e:
-                        log(f"QTY ERROR (qty={qty}) ❌ {e}")
-                        f.write(f"{qty};;ERROR\n")
-                        continue
+                            select_option(page, "Quantity", qty)
+                            price = get_price(page)
 
+                            final_price = price - 10
+                            print(f"{price} {final_price:.2f}")
+                            f.write(f"{qty};;{final_price:.2f}\n")
 
-                f.write("\n")
+                            break  # success → exit retry loop
+
+                        except Exception as e:
+                            log(f"QTY ERROR (qty={qty}) ❌ {e}")
+
+                            if attempt == 2:
+                                f.write(f"{qty};;ERROR\n")
+                                break
+
+                            log("Reloading page and restoring config…")
+                            page.reload(timeout=60000)
+
+                            apply_current_config(
+                                page,
+                                cp, cs, lm, ip, ist, pg
+                            )
+
+                f.write("\n") # Add a newline between configurations
 
             except Exception as e:
                 log(f"CONFIG ERROR ❌ {e}")
                 f.write("CONFIG ERROR\n\n")
-
+                
     log("Closing browser")
     browser.close()
 

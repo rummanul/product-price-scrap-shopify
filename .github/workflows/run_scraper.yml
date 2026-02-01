@@ -1,0 +1,37 @@
+name: One-Time Scraper Run
+
+on:
+  workflow_dispatch: # This creates the "Run Workflow" button for a single manual start
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # GitHub allows a maximum of 360 minutes (6 hours) per job
+    timeout-minutes: 360 
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Playwright and Deps
+      run: |
+        pip install playwright
+        # If you have other libraries like pandas or requests, add them here:
+        # pip install pandas
+        playwright install chromium
+        playwright install-deps chromium
+
+    - name: Run Scrapper
+      run: python scrapper.py
+
+    - name: Upload Output File
+      if: always() # Uploads even if the script hits the 6-hour timeout
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-scraped-results
+        path: "*.txt" # This grabs any .txt file your script created

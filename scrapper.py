@@ -10,7 +10,6 @@ LAMINATE = {"Gloss Laminate": "G"}
 INTERNAL_PRINTING = {"Full Colour (CMYK) two sides": "FC"}
 INTERNAL_STOCK = {"115gsm Gloss Artpaper": "100GA"}
 
-
 OUTPUT_FILE = (
     f"A5P_{COVER_PRINTING['Full Colour (CMYK) one side']}_"
     f"{COVER_STOCK['250gsm Gloss Artboard']}_"
@@ -20,10 +19,10 @@ OUTPUT_FILE = (
 )
 
 print(OUTPUT_FILE)
-exit()
+# exit()
 
 
-PAGES = list(range(48, 302, 2))
+PAGES = list(range(132, 302, 2))
 QUANTITIES = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 225, 250, 275, 300]
 
 
@@ -167,7 +166,10 @@ def get_price(page):
 # =====================================================
 with sync_playwright() as p:
     log("Launching browser")
-    browser = p.firefox.launch(headless=True, slow_mo=120)
+    browser = p.chromium.launch(
+        headless=True,
+        args=["--no-sandbox", "--disable-dev-shm-usage"]
+    )
     page = browser.new_page()
 
     page.goto(URL, timeout=60000)
@@ -252,7 +254,7 @@ with sync_playwright() as p:
             except Exception as e:
                 log(f"CONFIG ERROR ❌ {e}")
                 f.write("CONFIG ERROR\n\n")
-
+                
     log("Closing browser")
     browser.close()
 
