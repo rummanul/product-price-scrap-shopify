@@ -58,6 +58,7 @@ def select_option(page, label_text, value, retries=10):
             page.wait_for_timeout(200)  # allow animation frame
 
             menu = group.locator("ul.dropdown-menu")
+            menu.wait_for(state="visible", timeout=5000)
 
             # Numeric option first
             numeric = menu.locator(f'li[data-value="{value_str}"] a.filter-option')
